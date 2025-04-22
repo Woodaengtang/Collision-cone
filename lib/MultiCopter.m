@@ -94,7 +94,7 @@ classdef MultiCopter < handle
             obj.vel_d = NaN([3, 1]);
             obj.quat_d = NaN([4, 1]);
             obj.omg_d = NaN([3, 1]);
-            
+
             obj.T = NaN;
             obj.Mx = NaN;
             obj.My = NaN;
@@ -105,7 +105,7 @@ classdef MultiCopter < handle
         function state = get_state(obj)
             state = [obj.pos', obj.vel', obj.att', obj.omg']';
         end
-        
+
         function input = get_inputs(obj)
             obj.u = [obj.T; obj.Mx; obj.My; obj.Mz];
             input = obj.u;
@@ -124,11 +124,11 @@ classdef MultiCopter < handle
             sinpsi = sin(psi);
             cospsi = cos(psi);
 
-            Ri2b = 
+            Ri2b =
         end
-        
+
         function obj = eom(obj)
-            
+
         end
     end
 end
