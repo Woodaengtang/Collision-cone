@@ -20,5 +20,5 @@ function euler = quat2euler(quaternion)
     
     yaw   = atan2(2*(e0*ez + ex*ey),  e0^2 + ex^2 - ey^2 - ez^2);
     
-    euler = [rol, pit, yaw]';
+    euler = [rol; pit; yaw];
 end

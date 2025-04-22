@@ -2,38 +2,45 @@ classdef ControllerPID < handle
     % ControllerPID: A simple PID controller
 
     properties
-        kp          % Proportional gain
-        ki          % Integral gain
-        kd          % Differential gain
-
-        prevError   % Previous error (NaN until first update)
-        intError    % Accumulated integral of error
-        output      % Most recent controller output
-        dt          % Sampling time
-        sim_time    % Total simulation time
-        u_min       % Minimum input saturation
-        u_max       % Maximum input saturation
+        dt              % Time step for integration (s)
+        time            % Current simulation time (s)
+        timeSim         % Total simulation duration (s)
+        
+        kp              % Proportional gain
+        ki              % Integral gain
+        kd              % Differential gain
+        
+        prevError       % Previous error (NaN until first update)
+        intError        % Accumulated integral of error
+        output          % Most recent controller output
+        uMin            % Minimum input saturation
+        uMax            % Maximum input saturation
+        
+        loggerTime      % Preallocated time log array
+        loggerIndex     % Current write index for logging
+        loggerError     % Logged error over time
+        loggerOutput    % Logged controller output over time
     end
 
     methods
-        function obj = ControllerPID(kp, ki, kd, dt, sim_time)
+        function obj = ControllerPID(kp, ki, kd, dt, timeSim)
             % Constructor: set gains and sampling time, initialize state
             if (dt <= 0)
                 error("Positive sampling time dt is required");
-            elseif (sim_time <= 0)
+            elseif (timeSim <= 0)
                 error("Positive simulation time sim_time is required");
             end
             obj.kp = kp;
             obj.ki = ki;
             obj.kd = kd;
             obj.dt = dt;
-            obj.sim_time = sim_time;
+            obj.timeSim = timeSim;
             % Initialize error history to NaN so first derivative term is forced to zero
             obj.prevError = NaN;
             obj.intError  = 0;
             obj.output    = 0;
-            obj.u_min = Nan;
-            obj.u_max = Nan;
+            obj.uMin = Nan;
+            obj.uMax = Nan;
         end
 
         function reset(obj)
@@ -43,19 +50,19 @@ classdef ControllerPID < handle
             obj.output    = 0;
         end
 
-        function set_output_saturation(obj, u_min, u_max)
+        function setOutputSaturation(obj, u_min, u_max)
             % set_input_saturation: setting the saturation of the controller output
-            obj.u_min = u_min;
-            obj.u_max = u_max;
+            obj.uMin = u_min;
+            obj.uMax = u_max;
         end
 
-        function u = input_saturation(obj, u)
+        function u = inputSaturation(obj, u)
             % input_saturation: clamping the output to [u_min,u_max]
-            if ~isnan(obj.u_min)
-                u = max(u, obj.u_min);
+            if ~isnan(obj.uMin)
+                u = max(u, obj.uMin);
             end
-            if ~isnan(obj.u_max)
-                u = min(u, obj.u_max);   % element‑wise min
+            if ~isnan(obj.uMax)
+                u = min(u, obj.uMax);   % element‑wise min
             end
         end
 
@@ -85,7 +92,7 @@ classdef ControllerPID < handle
             end
 
             unsat = P + I + D;
-            obj.output = obj.input_saturation(obj, unsat); % Combine terms
+            obj.output = obj.inputSaturation(obj, unsat); % Combine terms
             u = obj.output;
 
             obj.prevError = err;    % Save error for next derivative calculation

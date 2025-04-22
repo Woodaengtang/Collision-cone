@@ -12,6 +12,6 @@ function quat = euler2quat(euler)
     ey = cosyaw*sinpit*cosrol + sinyaw*cospit*sinrol;
     ez = sinyaw*cospit*cosrol - cosyaw*sinpit*sinrol;
 
-    quat = [e0, ex, ey, ez]';
+    quat = [e0; ex; ey; ez];
     quat = quat./norm(quat);
 end

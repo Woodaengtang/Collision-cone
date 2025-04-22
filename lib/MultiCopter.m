@@ -3,132 +3,231 @@ classdef MultiCopter < handle
     % It operates in the FLU coordinate frame.
 
     properties
-        g
-        dt
-        time
-        log_time
-        sim_time
+        g                   % Gravity acceleration (m/s^2)
+        dt                  % Time step for integration (s)
+        time                % Current simulation time (s)
+        timeSim             % Total simulation duration (s)
 
-        m
-        arm_len
-        inertia
+        mass                % Mass of the quadcopter (kg)
+        armLength           % Distance from center to rotor (m)
+        inertia             % Inertia matrix (3×3) of the vehicle
 
-        pos
-        pos_d
-        pf
-        pl
-        pu
+        pos                 % Position vector [x; y; z] in FLU frame (m)
+        posF                % Forward component of position (x)
+        posL                % Left component of position (y)
+        posU                % Up component of position (z)
+        posDot              % Time derivative of position (velocity) [m/s]
 
-        vel
-        vel_d
-        vf
-        vl
-        vu
+        vel                 % Velocity vector [vx; vy; vz] in FLU frame (m/s)
+        velF                % Forward velocity component (vx)
+        velL                % Left velocity component (vy)
+        velU                % Up velocity component (vz)
+        velDot              % Time derivative of velocity (acceleration) [m/s^2]
 
-        quat
-        quat_d
-        e0
-        ex
-        ey
-        ez
+        quat                % Attitude quaternion [e0; ex; ey; ez]
+        e0                  % Quaternion scalar part
+        ex                  % Quaternion x‑component
+        ey                  % Quaternion y‑component
+        ez                  % Quaternion z‑component
+        quatDot             % Time derivative of quaternion
 
-        att
-        rol
-        pit
-        yaw
+        att                 % Euler angles [roll; pitch; yaw] (rad)
+        rol                 % Roll angle φ (rad)
+        pit                 % Pitch angle θ (rad)
+        yaw                 % Yaw angle ψ (rad)
 
-        omg
-        omg_d
-        p
-        q
-        r
+        omg                 % Body angular rate vector [p; q; r] (rad/s)
+        p                   % Roll rate p (rad/s)
+        q                   % Pitch rate q (rad/s)
+        r                   % Yaw rate r (rad/s)
+        omgDot              % Time derivative of angular rate (rad/s^2)
 
-        u
-        T
-        Mx
-        My
-        Mz
+        u                   % Control input vector [T; Mx; My; Mz]
+        thrust              % Total thrust command T (N)
+        moment              % Moment commands [Mx; My; Mz] (N·m)
+
+        inducedDragCoeff    % Induced drag coefficient matrix (3×3)
+
+        loggerTime          % Preallocated time log array
+        loggerIndex         % Current write index for logging
+        loggerPos           % Logged position over time
+        loggerVel           % Logged velocity over time
+        loggerQuat          % Logged quaternion over time
+        loggerAtt           % Logged Euler angles over time
+        loggerOmg           % Logged angular rates over time
+        loggerInput         % Logged control inputs over time
     end
 
-    methods
-        function obj = MultiCopter(initCond, sim_time)
 
+    methods
+        function obj = MultiCopter(initCond, initInput, simTime)
             params = containers.Map({"Mass", "arm_len", "Ixx", "Iyy", "Izz"},...
                 {2, 0.25, 0.021667, 0.021667, 0.04});
 
             obj.g = 9.81;
             obj.time = 0;
             obj.dt = 0.001;
-            obj.sim_time = sim_time;
-            obj.log_time = 0:dt:sim_time;
+            obj.timeSim = simTime;
 
-            obj.m = params("Mass");
-            obj.arm_len = params("arm_len");
+            obj.mass = params("Mass");
+            obj.armLength = params("arm_len");
             obj.inertia = diag([params("Ixx"), params("Iyy"), params("Izz")]);
 
-            obj.pf = initCond.pos(1);
-            obj.pl = initCond.pos(2);
-            obj.pu = initCond.pos(3);
-            obj.pos = [obj.pf; obj.pl; obj.pu];
+            obj.pos = initCond.pos;
+            [obj.posF, obj.posL, obj.posU] = deal(obj.pos(1), obj.pos(2), obj.pos(3));
+            
+            obj.vel = initCond.vel;
+            [obj.velF, obj.velL, obj.velU] = deal(obj.vel(1), obj.vel(2), obj.vel(3));
 
-            obj.vf = initCond.vel(1);
-            obj.vl = initCond.vel(2);
-            obj.vu = initCond.vel(3);
-            obj.vel = [obj.vf; obj.vl; obj.vu];
+            obj.quat = initCond.quat;
+            [obj.e0, obj.ex, obj.ey, obj.ez] = deal(obj.quat(1), obj.quat(2), obj.quat(3), obj.quat(4));
 
-            obj.e0 = initCond.quat(1);
-            obj.ex = initCond.quat(2);
-            obj.ey = initCond.quat(3);
-            obj.ez = initCond.quat(4);
-            obj.quat = [obj.e0, obj.ex, obj.ey, obj.ez];
+            obj.att = quat2euler(initCond.quat);
+            [obj.rol, obj.pit, obj.yaw] = deal(obj.att(1), obj.att(2), obj.att(3));
 
-            [obj.rol, obj.pit, obj.yaw] = quat2euler(initCond.q);
-            obj.att = [obj.rol; obj.pit; obj.yaw];
+            obj.omg = initCond.omega;
+            [obj.p, obj.q, obj.r] = deal(obj.omg(1), obj.omg(2), obj.omg(3));
 
-            obj.p = initCond.omega(1);
-            obj.q = initCond.omega(2);
-            obj.r = initCond.omega(3);
-            obj.omg = [obj.p; obj.q; obj.r];
+            obj.posDot = zeros([3, 1]);
+            obj.velDot = zeros([3, 1]);
+            obj.quatDot = zeros([4, 1]);
+            obj.omgDot = zeros([3, 1]);
 
-            obj.pos_d = NaN([3, 1]);
-            obj.vel_d = NaN([3, 1]);
-            obj.quat_d = NaN([4, 1]);
-            obj.omg_d = NaN([3, 1]);
+            obj.u = initInput;
+            [obj.thrust, obj.moment] = deal(obj.u(1), obj.u(2:end));
+            obj.inducedDragCoeff = zeros([3, 3]);  % No induced drag assumption
 
-            obj.T = NaN;
-            obj.Mx = NaN;
-            obj.My = NaN;
-            obj.Mz = NaN;
-            obj.u = [obj.T; obj.Mx; obj.My; obj.Mz];
+            obj.loggerTime = 0 : obj.dt : obj.timeSim;
+            obj.loggerIndex = 1;
+            obj.loggerPos = NaN([3, length(obj.loggerTime)]);
+            obj.loggerVel = NaN([3, length(obj.loggerTime)]);
+            obj.loggerQuat = NaN([4, length(obj.loggerTime)]);
+            obj.loggerAtt = NaN([3, length(obj.loggerTime)]);
+            obj.loggerOmg = NaN([3, length(obj.loggerTime)]);
+            obj.loggerInput = NaN([4, length(obj.loggerTime)]);
+            obj.loggerPos(obj.loggerIndex, :) = obj.pos;
+            obj.loggerVel(obj.loggerIndex, :) = obj.vel;
+            obj.loggerQuat(obj.loggerIndex, :) = obj.quat;
+            obj.loggerAtt(obj.loggerIndex, :) = quat2eul(obj.quat);
+            obj.loggerOmg(obj.loggerIndex, :) = obj.omg;
+            obj.loggerInput(obj.loggerIndex, :) = obj.u;
         end
 
-        function state = get_state(obj)
+        function state = getState(obj)
             state = [obj.pos', obj.vel', obj.att', obj.omg']';
         end
+ 
+        function Ri2b = inertial2Body(~, quaternion)
+            euler = quat2euler(quaternion);
+            [phi, theta, psi] = deal(euler(1), euler(2), euler(3));
+            [sphi, cphi] = deal(sin(phi), cos(phi));
+            [stht, ctht] = deal(sin(theta), cos(theta));
+            [spsi, cpsi] = deal(sin(psi), cos(psi));
 
-        function input = get_inputs(obj)
-            obj.u = [obj.T; obj.Mx; obj.My; obj.Mz];
-            input = obj.u;
+            Ri2b = [ctht*cpsi, ctht*spsi, -stht;...
+                    sphi*stht*cpsi - cphi*spsi, sphi*stht*spsi + cphi*cpsi, sphi*ctht;...
+                    cphi*stht*cpsi + sphi*spsi, cphi*stht*spsi - sphi*cpsi, cphi*ctht];
+        end
+        
+        function posDot = funcPosDot(~, vel)
+            posDot = vel;
         end
 
-        function Ri2b = inertial2body(obj)
-            euler = quat2euler(obj.quat);
-            phi = euler(1);     % roll
-            theta = euler(2);   % pitch
-            psi = euler(3);     % yaw
-
-            sinphi = sin(phi);
-            cosphi = cos(phi);
-            sintht = sin(theta);
-            costht = cos(theta);
-            sinpsi = sin(psi);
-            cospsi = cos(psi);
-
-            Ri2b =
+        function velDot = funcVelDot(obj, vel, quat, thrust)
+            ed = [0; 0; -1];
+            Ri2b = obj.inertial2Body(quat);
+            velDot = obj.g*ed - Ri2b * obj.inducedDragCoeff * Ri2b' * vel - thrust/obj.mass*Ri2b'*ed;
         end
 
-        function obj = eom(obj)
+        function quatDot = funcQuatDot(~, quat, omega)
+            [pOmg, qOmg, rOmg] = deal(omega(1), omega(2), omega(3));
+            Omega = [0, -pOmg, -qOmg, -rOmg;...
+                     pOmg, 0, rOmg, -qOmg;...
+                     qOmg, -rOmg, 0, pOmg;...
+                     rOmg, qOmg, -pOmg, 0];
+            quatDot = Omega*quat./2;
+        end
 
+        function omgDot = funcOmegaDot(~, J, omega, moment)
+            omgDot = -J\(cross(omega, J*omega) + moment);
+        end
+
+        function obj = equationOfMotion(obj)
+            obj.posDot = obj.funcPosDot(obj.vel);
+            obj.velDot = obj.funcVelDot(obj.vel, obj.quat, obj.thrust);
+            obj.quatDot = obj.funcQuatDot(obj.quat, obj.omg);
+            obj.omgDot = obj.funcOmegaDot(obj.inertia, obj.omg, obj.moment);
+        end
+
+        function obj = rk4Step(obj)
+            h = obj.dt;               % time‑step shorthand
+
+            %------------- k1 ------------------------------------------------
+            k1_pos   = obj.funcPosDot(obj.vel);
+            k1_vel   = obj.funcVelDot(obj.vel, obj.quat, obj.thrust);
+            k1_quat  = obj.funcQuatDot(obj.quat, obj.omg);
+            k1_omega = obj.funcOmegaDot(obj.inertia, obj.omg, obj.moment);
+
+            %------------- k2 ------------------------------------------------
+            % pos2 = obj.pos + h*k1_pos/2;
+            vel2 = obj.vel + h*k1_vel/2;
+            quat2 = obj.quat + h*k1_quat/2;
+            omg2 = obj.omg + h*k1_omega/2;
+
+            k2_pos   = obj.funcPosDot(vel2);
+            k2_vel   = obj.funcVelDot(vel2, quat2, obj.thrust);
+            k2_quat  = obj.funcQuatDot(quat2, omg2);
+            k2_omega = obj.funcOmegaDot(obj.inertia, omg2, obj.moment);
+
+            %------------- k3 ------------------------------------------------
+            % pos3 = obj.pos + h*k2_pos/2;
+            vel3 = obj.vel + h*k2_vel/2;
+            quat3 = obj.quat + h*k2_quat/2;
+            omg3 = obj.omg + h*k2_omega/2;
+
+            k3_pos = obj.funcPosDot(vel3);
+            k3_vel = obj.funcVelDot(vel3, quat3, obj.thrust);
+            k3_quat = obj.funcQuatDot(quat3, omg3);
+            k3_omega = obj.funcOmegaDot(obj.inertia, omg3, obj.moment);
+
+            %------------- k4 ------------------------------------------------
+            % pos4 = obj.pos + h*k3_pos;
+            vel4 = obj.vel + h*k3_vel;
+            quat4 = obj.quat + h*k3_quat;
+            omg4 = obj.omg + h*k3_omega;
+
+            k4_pos = obj.funcPosDot(vel4);
+            k4_vel = obj.funcVelDot(vel4, quat4, obj.thrust);
+            k4_quat = obj.funcQuatDot(quat4, omg4);
+            k4_omega = obj.funcOmegaDot(obj.inertia, omg4, obj.moment);
+
+            %------------- state update -------------------------------------
+            obj.pos   = obj.pos   + (h/6) * (k1_pos   + 2*k2_pos   + 2*k3_pos   + k4_pos  );
+            obj.vel   = obj.vel   + (h/6) * (k1_vel   + 2*k2_vel   + 2*k3_vel   + k4_vel  );
+            obj.quat  = obj.quat  + (h/6) * (k1_quat  + 2*k2_quat  + 2*k3_quat  + k4_quat );
+            obj.omg   = obj.omg   + (h/6) * (k1_omega + 2*k2_omega + 2*k3_omega + k4_omega);
+            
+            % Numerical error accumulation prevention by quaternion normalization
+            obj.quat = obj.quat / norm(obj.quat);
+        end
+
+        function obj = stateLogger(obj)
+            obj.loggerIndex = obj.loggerIndex + 1;
+            obj.loggerPos(obj.loggerIndex, :) = obj.pos;
+            obj.loggerVel(obj.loggerIndex, :) = obj.vel;
+            obj.loggerQuat(obj.loggerIndex, :) = obj.quat;
+            obj.loggerAtt(obj.loggerIndex, :) = quat2eul(obj.quat);
+            obj.loggerOmg(obj.loggerIndex, :) = obj.omg;
+            obj.loggerInput(obj.loggerIndex, :) = obj.u;
+        end
+            
+        function obj = applyControlStep(obj, ctrl_input)
+            obj.u = ctrl_input;
+            [obj.thrust, obj.moment] = deal(obj.u(1), obj.u(2:end));
+            obj.equationOfMotion();
+            obj.rk4Step();
+            obj.time = obj.time + obj.dt;
+            obj.stateLogger();
         end
     end
 end
