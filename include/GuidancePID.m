@@ -3,7 +3,7 @@ classdef GuidancePID < ControllerPID
     properties
         current_att
     end
-    
+
     methods
         function obj = GuidancePID(name, gains, times, ioSize)
             obj = obj@ControllerPID(name, gains, times, ioSize);
@@ -13,7 +13,7 @@ classdef GuidancePID < ControllerPID
         function obj = getAtt(obj, current_att)
             obj.current_att = current_att;
         end
-        
+
         function u = update(obj, reference, measurement)
             % update: compute PID output, forcing D=0 on first call
             %
