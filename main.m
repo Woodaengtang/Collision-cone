@@ -3,79 +3,162 @@ addpath("include\");
 addpath("lib\");
 
 %% Initialize simulation settings
-[initCond, initInput, params, simTime] = initSimul();
-egoUAV = MultiCopter(initCond, initInput, params, simTime);
+% Define the initial state vector: [pn, pe, pd, vn, ve, vd, phi, theta, psi, p, q, r]
+drone_initStates = [0, 0, -10,...       % Position: pn, pe, pd
+                    0, 3, 0,...         % Velocity: vn, ve, vd
+                    0, 0, 1.5708,...    % Euler angles: phi, theta, psi
+                    0, 0, 0]';          % Angular rates: p, q, r
+drone_initInputs = [19.62, 0, 0, 0]';   % Define the initial control inputs: [T, M1, M2, M3] (Thrust and Moments)
 
-[simulTime, velTimes, attTimes, omgTimes] = initRatesPID();
-thrustGain = initGainsPID([25; 0.001; 0.005]);
-velGainPID = initGainsPID([25; 0.001; 0.005]);    % m/s in FLU coordinate
-attGainPID = initGainsPID([10; 0; 0.00005]);      % Euler angle
-omgGainPID = initGainsPID([10; 0.2; 0.1]);
-rateSaturation = deg2rad(60);
-attSaturation = deg2rad(30);
+% Create a QuadcopterModel object with the initial states and inputs
+egoUAV = QuadcopterModel(drone_initStates, drone_initInputs);
 
-[ioThrust, ioHeading] = deal(1, 1);
-ioAtt = 2;
-ioSize = 3;
+% Set the simulation time step and initial time
+ts = egoUAV.dt;
+time = 0;                       % Initialize simulation time to zero
+egoGoalpoint = [0, 50, -10]';   % Define the goal (target) position for the quadcopter
+egoSpeed = 3;                   % Desired speed for the quadcopter (m/s)
 
-maxThrust = initInput(1)*2;
-minThrust = 0;
-thrustCtrl = ThrustPID("thrustCtrl", thrustGain, velTimes, ioThrust, initInput(1));
-thrustCtrl.setOutputSaturation(minThrust, maxThrust);
+%% Intruder Initialization
+% Define the initial state for the intruder (position, velocity, acceleration)
+Int.Position = [-22, 35, -10]';
+Int.Velocity = [2.304, -1.2, 0.0]';
+Int.Acceleration = [0, 0, 0]';
 
-headingCtrl = HeadingPID("headingCtrl", attGainPID, velTimes, ioHeading);
-headingCtrl.setOutputSaturation(-rateSaturation, rateSaturation);
+%% Variable Initialization for Logging and Control
+R_safe = 3;                 % Set the safety radius (3 m)
+d_thres = 0.5;              % Set the threshold distance for waypoint arrival
+aiming_point = [];          % Aiming (target) point
+prev_waypoint = drone_initStates(1:3);  % Initialize previous waypoint with initial position
+next_waypoint = egoGoalpoint;           % Initially set next waypoint as goal point
+egoCPA = [];                % Ego's CPA (Closest Point of Approach)
+intruderCPA = [];           % Intruder's CPA
+ego_state_log = [];         % Log for full quadcopter state (position, velocity, Euler angles, angular rates)
+ego_command_log = [];       % Log for command output (desired control values)
+intruder_state_log = [];    % Log for intruder's state
+intruder_estimate_log = []; % Log for estimated intruder state (e.g., via Kalman filter)
+ellipse_log = [];           % Log for collision threat ellipse data
+egoCPA_log = [];            % Log for egoCPA values
+aiming_point_log = [];      % Log for aiming points
+control_input_log = [];     % Log for control inputs
+CPA_data = [];              % Array to store CPA data over several iterations
+effectiveCPA = [];          % Effective CPA value
+idx_log = [];               % Log of index flags or state conditions
+index = false;              % Flag for a certain condition status
 
-velCtrl = GuidancePID("velCtrl", velGainPID, velTimes, ioSize);
-velCtrl.setOutputSaturation(-attSaturation, attSaturation);
+first_detect = true;        % Flag to indicate the first detection
 
-attCtrl = ControllerPID("attCtrl", attGainPID, attTimes, ioSize);
-attCtrl.setOutputSaturation(-rateSaturation, rateSaturation);
+collision_threat_log = [];  % Log for collision threat values
+collision_threat = zeros([3, 1]);  % Collision threat vector initialized to zero
+collision_std_log = [];     % Log for collision standard deviation data
+collision_std = zeros([3, 1]);
 
-omgCtrl = RatePID("omgCtrl", omgGainPID, omgTimes, ioSize);
+point_arrived = false;      % Flag indicating if the waypoint has been reached
+spanAngle = pi/36;          % Angular span for generating candidate cones
+varphi = spanAngle : spanAngle : 2*pi;  % Array of candidate angles for aiming
+escapeGainKe = 0.8;         % Weighting factor for escape command
 
-time = 0;
+% Initialize reference signal for guidance (desired velocity)
+refSig          = [0; 3; 0];    % Initial reference velocity input (3 m/s in y-direction)
+prev_refSig     = refSig;       % Store previous reference signal for smoothing
+sig_k           = 0.985;        % Smoothing gain (low-pass filtering effect)
+data_size = 20;                 % Maximum size of stored CPA data
 
-% loop indexes
-loopIdx = 0;
-loopVel = omgTimes.rate/velTimes.rate;
-loopAtt = omgTimes.rate/attTimes.rate;
+candidates_log = zeros([3, 72, 15000]); % Log for candidate aiming directions (3 x 72 x max sample size)
 
-distThreshold = 0.5;    % distance threshold
+% Set up modular control cycle indices
+successive_idx  = 0;    % Loop iteration counter for closed-loop control
+guidance_ = 20;         % Guidance control module period (executed at 50Hz)
+attitude_ = 4;          % Attitude control module period (executed at 250Hz)
+ref_update = false;     % Flag indicating if the reference signal was updated
 
-goalPoint = [50, 0, 10];
 
-% Initial reference command
-ref = struct( ...
-    "velocity", [2; 2; 0],...
-    "attitude", zeros([3,1]),...
-    "omega", zeros([3,1]));
 
-%% Main simulation loops
-while and(time <= simulTime, norm(goalPoint-egoUAV.pos) > distThreshold)
 
-    if mod(loopIdx, loopVel) == 0
-        egoUAV.u(1) = thrustCtrl.update(ref.velocity(3), egoUAV.vel(3));
-        velCtrl.getAtt(egoUAV.att);
-        ref.attitude = velCtrl.update(ref.velocity, egoUAV.vel);
-        ref.attitude(3) = headingCtrl.update(atan2(ref.velocity(2), ref.velocity(1)), egoUAV.yaw);
-    end
 
-    if mod(loopIdx, loopAtt) == 0
-        ref.omega = attCtrl.update(ref.attitude, egoUAV.att);
-    end
 
-    omgCtrl.getRate(egoUAV.omg);
-    egoUAV.moment = omgCtrl.update(ref.omega, egoUAV.omg);
-    [egoUAV.u(2), egoUAV.u(3), egoUAV.u(4)] = deal(egoUAV.moment(1), egoUAV.moment(2), egoUAV.moment(3));
-    egoUAV.applyControlStep();
-    loopIdx = loopIdx + 1;
-    time = time + egoUAV.dt;
-end
-%% Save logs to files
-folderPath = fullfile(pwd, 'log', 'simul');
-if ~exist(folderPath, 'dir')
-    mkdir(folderPath);
-end
-save(fullfile(folderPath, "SimComparison.mat"), "attCtrl",...
-    "egoUAV", "headingCtrl", "omgCtrl", "thrustCtrl", "velCtrl");
+
+
+
+
+
+
+
+
+
+% [initCond, initInput, params, simTime] = initSimul();
+% egoUAV = MultiCopter(initCond, initInput, params, simTime);
+% 
+% [simulTime, velTimes, attTimes, omgTimes] = initRatesPID();
+% thrustGain = initGainsPID([25; 0.001; 0.005]);
+% velGainPID = initGainsPID([25; 0.001; 0.005]);    % m/s in FLU coordinate
+% attGainPID = initGainsPID([10; 0; 0.00005]);      % Euler angle
+% omgGainPID = initGainsPID([10; 0.2; 0.1]);
+% rateSaturation = deg2rad(60);
+% attSaturation = deg2rad(30);
+% 
+% [ioThrust, ioHeading] = deal(1, 1);
+% ioAtt = 2;
+% ioSize = 3;
+% 
+% maxThrust = initInput(1)*2;
+% minThrust = 0;
+% thrustCtrl = ThrustPID("thrustCtrl", thrustGain, velTimes, ioThrust, initInput(1));
+% thrustCtrl.setOutputSaturation(minThrust, maxThrust);
+% 
+% headingCtrl = HeadingPID("headingCtrl", attGainPID, velTimes, ioHeading);
+% headingCtrl.setOutputSaturation(-rateSaturation, rateSaturation);
+% 
+% velCtrl = GuidancePID("velCtrl", velGainPID, velTimes, ioSize);
+% velCtrl.setOutputSaturation(-attSaturation, attSaturation);
+% 
+% attCtrl = ControllerPID("attCtrl", attGainPID, attTimes, ioSize);
+% attCtrl.setOutputSaturation(-rateSaturation, rateSaturation);
+% 
+% omgCtrl = RatePID("omgCtrl", omgGainPID, omgTimes, ioSize);
+% 
+% time = 0;
+% 
+% % loop indexes
+% loopIdx = 0;
+% loopVel = omgTimes.rate/velTimes.rate;
+% loopAtt = omgTimes.rate/attTimes.rate;
+% 
+% distThreshold = 0.5;    % distance threshold
+% 
+% goalPoint = [50, 0, 10];
+% 
+% % Initial reference command
+% ref = struct( ...
+%     "velocity", [2; 2; 0],...
+%     "attitude", zeros([3,1]),...
+%     "omega", zeros([3,1]));
+% 
+% %% Main simulation loops
+% while and(time <= simulTime, norm(goalPoint-egoUAV.pos) > distThreshold)
+% 
+%     if mod(loopIdx, loopVel) == 0
+%         egoUAV.u(1) = thrustCtrl.update(ref.velocity(3), egoUAV.vel(3));
+%         velCtrl.getAtt(egoUAV.att);
+%         ref.attitude = velCtrl.update(ref.velocity, egoUAV.vel);
+%         ref.attitude(3) = headingCtrl.update(atan2(ref.velocity(2), ref.velocity(1)), egoUAV.yaw);
+%     end
+% 
+%     if mod(loopIdx, loopAtt) == 0
+%         ref.omega = attCtrl.update(ref.attitude, egoUAV.att);
+%     end
+% 
+%     omgCtrl.getRate(egoUAV.omg);
+%     egoUAV.moment = omgCtrl.update(ref.omega, egoUAV.omg);
+%     [egoUAV.u(2), egoUAV.u(3), egoUAV.u(4)] = deal(egoUAV.moment(1), egoUAV.moment(2), egoUAV.moment(3));
+%     egoUAV.applyControlStep();
+%     loopIdx = loopIdx + 1;
+%     time = time + egoUAV.dt;
+% end
+% %% Save logs to files
+% folderPath = fullfile(pwd, 'log', 'simul');
+% if ~exist(folderPath, 'dir')
+%     mkdir(folderPath);
+% end
+% save(fullfile(folderPath, "SimComparison.mat"), "attCtrl",...
+%     "egoUAV", "headingCtrl", "omgCtrl", "thrustCtrl", "velCtrl");
