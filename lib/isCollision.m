@@ -1,4 +1,4 @@
-function [rMin, tMin, flag] = isCollision(ego_motion, int_motion, R_safe)
+function [rMin, tMin, rI, vI, flag] = isCollision(ego_motion, int_motion, R_safe)
     % give flag if UAV is in collision threat or not
 
     NED2FLU = [1, 0, 0;...
@@ -22,6 +22,12 @@ function [rMin, tMin, flag] = isCollision(ego_motion, int_motion, R_safe)
     phiVel = V_B*(-cos(rI.eta)*sin(rI.phi)*cos(rI.mu - rI.theta) + sin(rI.eta)*cos(rI.phi)) - V_A*(-cos(rI.alpha)*sin(rI.phi)*cos(rI.beta - rI.theta) + sin(rI.alpha)*cos(rI.phi));
     rVel = V_B*(cos(rI.eta)*cos(rI.phi)*cos(rI.mu - rI.theta) + sin(rI.eta)*sin(rI.phi)) - V_A*(cos(rI.alpha)*cos(rI.phi)*cos(rI.beta - rI.theta) + sin(rI.alpha)*cos(rI.phi));
     
+    % Velocity information is defined in FLU spherical coordinate
+    vI = struct(...
+        "thetaVel", thetaVel,...
+        "phiVel", phiVel,...
+        "rVel", rVel);
+
     rMin2 = norm(relPos)^2*((thetaVel^2 + phiVel^2)/relVel^2);
     rMin = sqrt(rMin2);
     tMin = -(norm(relPos)*rVel)/(relVel^2);

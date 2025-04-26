@@ -157,7 +157,7 @@ classdef MultiCopter < handle
         function velDot = funcVelDot(obj, vel, thrust)
             ed = [0; 0; -1];
             Ri2b = obj.inertial2Body();
-            velDot = obj.g*ed - Ri2b * obj.inducedDragCoeff * Ri2b' * vel - (thrust/obj.mass)*(Ri2b'*ed);
+            velDot = obj.g*ed - Ri2b' * obj.inducedDragCoeff * Ri2b * vel - (thrust/obj.mass)*(Ri2b'*ed);
         end
 
         function quatDot = funcQuatDot(~, quat, omega)

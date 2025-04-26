@@ -59,10 +59,13 @@ varphi = spanAngle : spanAngle : 2*pi;  % Array of candidate angles for aiming
 escapeGainKe = 0.8;         % Weighting factor for escape command
 
 % Initialize reference signal for guidance (desired velocity)
-refSig          = [0; 3; 0];    % Initial reference velocity input (3 m/s in y-direction)
-prev_refSig     = refSig;       % Store previous reference signal for smoothing
+refVel          = [0; 3; 0];    % Initial reference velocity input (3 m/s in y-direction)
+refVelUpdate    = false;
+prev_refSig     = refVel;       % Store previous reference signal for smoothing
+refAtt          = [];
+refAttUpdate    = false;
 sig_k           = 0.985;        % Smoothing gain (low-pass filtering effect)
-data_size = 20;                 % Maximum size of stored CPA data
+data_size       = 20;           % Maximum size of stored CPA data
 
 candidates_log = zeros([3, 72, 15000]); % Log for candidate aiming directions (3 x 72 x max sample size)
 
@@ -70,9 +73,51 @@ candidates_log = zeros([3, 72, 15000]); % Log for candidate aiming directions (3
 successive_idx  = 0;    % Loop iteration counter for closed-loop control
 guidance_ = 20;         % Guidance control module period (executed at 50Hz)
 attitude_ = 4;          % Attitude control module period (executed at 250Hz)
-ref_update = false;     % Flag indicating if the reference signal was updated
 
+while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
+    % Update Intruder's State (Constant Velocity Assumption)
+    Int.Position = Int.Position + ts * Int.Velocity + (ts^2 * Int.Acceleration)/2;
+    Int.Velocity = Int.Velocity + ts * Int.Acceleration;
+    intruderMotion = [Int.Position; Int.Velocity; Int.Acceleration];
+    
+    % Reset collision metrics for this iteration
+    collision_std = zeros([3, 1]);
+    collision_threat = zeros([3, 1]);
+    index = false;
 
+    if mod(successive_idx, guidance_) == 0
+        refVel = egoSpeed*(egoGoalpoint - egoUAV.r)./norm(egoGoalpoint - egoUAV.r);
+        egoUAV.guidanceControl(refVel);
+        isDangerous = false;
+        
+        if norm(egoUAV.r - Int.Position) < 20
+            [EstIntruderMotion, measured] = kinetic_kalman(intruderMotion, guidance_*ts);
+            [rMin, tMin, radInfo, velInfo, flag] = isCollision(egoUAV.x, EstIntruderMotion, R_safe);
+            if flag
+                flag = false;
+                refAttUpdate = true;
+                refDelta = pi/3;
+                refGamma = pi/4;
+                gainK = 7;
+                aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
+            else
+                refAttUpdate = false;
+            end
+        end
+    end
+
+    if mod(successive_idx, attitude_) == 0
+        if flag
+            egoUAV.phi_des = asin(aA(1)/(egoUAV.T/egoUAV.m));
+            egoUAV.theta_des = acos(aA(2)*(egoUAV.m/(egoUAV.T*cos(egoUAV.phi_des))));
+            egoUAV.psi_des = pi/2;
+            egoUAV.angleSaturation();
+        end
+        egoUAV.attitudeControl();
+    end
+    egoUAV.rateControl();
+    egoUAV.UpdateState();
+end
 
 
 
