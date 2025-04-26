@@ -28,9 +28,9 @@ function [rMin, tMin, rI, vI, flag] = isCollision(ego_motion, int_motion, R_safe
         "phiVel", phiVel,...
         "rVel", rVel);
 
-    rMin2 = norm(relPos)^2*((thetaVel^2 + phiVel^2)/relVel^2);
+    rMin2 = norm(relPos)^2*((thetaVel^2 + phiVel^2)/(relVel'*relVel));
     rMin = sqrt(rMin2);
-    tMin = -(norm(relPos)*rVel)/(relVel^2);
+    tMin = -(norm(relPos)*rVel)/(relVel'*relVel);
 
     if rMin2 < R_safe^2
         flag = true;    % in collision threat
