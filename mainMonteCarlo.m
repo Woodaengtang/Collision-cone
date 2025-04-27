@@ -21,6 +21,20 @@ sig_k = 0.985;
 guidance_       = 20;               % guidance index for modular operation 50Hz
 attitude_       = 4;                % attitude index for modular operation 250Hz
 
+dq = parallel.pool.DataQueue;
+afterEach(dq, @nUpdate);
+
+function nUpdate(~)
+    persistent progress N
+    if isempty(progress)
+        progress = 0;
+        N = 500;
+    end
+    progress = progress + 1;
+    fprintf("Progress: %d / %d (%.1f%%)\n", ...
+        progress, N, 100*progress/N);
+end
+
 parfor i = 1 : length(IntruderRandomPoints)
     successive_idx  = 0;        % Index for successive closed loop
     ego_state_log = [];         % Log for full quadcopter state (position, velocity, Euler angles, angular rates)
@@ -138,7 +152,8 @@ parfor i = 1 : length(IntruderRandomPoints)
     arrivalTime = [arrivalTime, time];
     % clear kineticKalman
     % clear Int egoUAV;
-    disp(i);
+    % disp(i);
+    send(dq, i);
 end
 %%
 fig_min_miss_dist = figure(1);

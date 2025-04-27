@@ -48,6 +48,7 @@ refVel = [0; 3; 0];    % Initial reference velocity input (3 m/s in y-direction)
 prev_refVel = refVel;       % Store previous reference signal for smoothing
 refAtt = [];
 sig_k = 0.985;        % Smoothing gain (low-pass filtering effect)
+gainK = NaN;
 
 % Set up modular control cycle indices
 successive_idx  = 0;    % Loop iteration counter for closed-loop control
@@ -69,9 +70,14 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
             if flag
                 refDelta = pi/3;
                 refGamma = pi/4;
-                gainK = 0.01;
-                aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
                 err = errFcn(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
+                if isnan(gainK)
+                    epsilon = err - 0.1;
+                    gainK = (1/tMin)*log(err/epsilon);
+                end
+                aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
+            else
+                gainK = NaN;
             end
         end
     end
