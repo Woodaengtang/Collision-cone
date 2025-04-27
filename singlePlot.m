@@ -44,8 +44,34 @@ end
 
 [~, idx] = min(miss_dist);
 
-
 %% plot data
+surf_face_alpha = 0.3;
+snapshot_linewidth = 2;
+ellipseColor = [0.5774, 0.5774, 0.5774];
+az = 258.8269;
+el = 25.3061;
+viewLine = [az, el];
+[xS, yS, zS] = sphere();
+
+snapshotFig = figure();
+snapshotFig.Position = [1000, 668, 1008, 570];
+hold on;
+grid on;
+egoTrajectory = plot3(ego_state_log(1,1:end), ego_state_log(2,1:end), ego_state_log(3,1:end), "g-", "LineWidth", snapshot_linewidth);
+intTrajectory = plot3(intruder_state_log(1,1:end), intruder_state_log(2,1:end), intruder_state_log(3,1:end), "r-", "LineWidth", snapshot_linewidth);
+egoMinDist = scatter3(ego_state_log(1, idx), ego_state_log(2, idx), ego_state_log(3, idx), "green", "LineWidth", snapshot_linewidth);
+intMinDist = scatter3(intruder_state_log(1, idx), intruder_state_log(2, idx), intruder_state_log(3, idx), "red", "LineWidth", snapshot_linewidth);
+xS = xS*R_safe + intruder_state_log(1, idx);
+yS = yS*R_safe + intruder_state_log(2, idx);
+zS = zS*R_safe + intruder_state_log(3, idx);
+surf(xS, yS, zS, "FaceAlpha", surf_face_alpha, "EdgeColor", "none", "FaceColor", ellipseColor);
+snapshotFig.CurrentAxes.ZDir = "Reverse";
+snapshotFig.CurrentAxes.YDir = "Reverse";
+xlabel("N-axis", "FontSize", 15); ylabel("E-axis", "FontSize", 15); zlabel("D-axis", "FontSize", 15);
+title("Avoiding the dynamic obstacle", "FontSize", 15);
+axis equal
+xlim([-2, 6]); ylim([17, 26]); zlim([-11, -9]); view(viewLine);
+
 input_linewidth = 1.5;
 output_linewidth = 2;
 idx_linewidth = 0.8;
@@ -217,5 +243,13 @@ grid on
 hold on
 plot(time, zeros([1,length(time)]), "r--" ,"LineWidth", input_linewidth);
 xlabel("time(s)"); ylabel("y(t)"); title("Plot of Collision condition");
+xlim([0, 25]);
+
+figure();
+plot(time, tMin_log, "LineWidth", output_linewidth);
+grid on;
+hold on;
+plot(time, zeros([1, length(time)]), "r--", "LineWidth", input_linewidth);
+xlabel("time(s)"); ylabel("tMin(t)"); title("Plot of minimum time");
 xlim([0, 25]);
 

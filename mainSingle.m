@@ -38,6 +38,8 @@ intruder_state_log = [];    % Log for intruder's state
 control_input_log = [];     % Log for control inputs
 rMin_log = [];
 rMin = NaN;
+tMin_log = [];
+tMin = NaN;
 aA = NaN([3, 1]);
 aA_log = [];
 err = NaN;
@@ -73,11 +75,9 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
                 err = errFcn(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
                 if isnan(gainK)
                     epsilon = err - 0.1;
-                    gainK = (1/tMin)*log(err/epsilon);
+                    gainK = 1.01*(1/tMin)*log(err/epsilon);
                 end
                 aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
-            else
-                gainK = NaN;
             end
         end
     end
@@ -109,6 +109,7 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     rMin_log = [rMin_log, rMin];
     aA_log = [aA_log, aA];
     err_log = [err_log, err];
+    tMin_log = [tMin_log, tMin];
 end
 
 folderPath = fullfile(pwd, 'log', 'single');
@@ -121,5 +122,5 @@ end
 % Save all main log variables to a MAT file using grouped save commands
 save(fullfile(folderPath, "SimSingle.mat"), "ego_state_log", ...
     "intruder_state_log", "ego_command_log", "control_input_log", ...
-    "rMin_log", "aA_log", "err_log");
+    "rMin_log", "aA_log", "err_log", "tMin_log");
 
