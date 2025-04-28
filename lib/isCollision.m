@@ -10,7 +10,7 @@ function [rMin, tMin, rI, vI, flag] = isCollision(ego_motion, int_motion, R_safe
     intVel = NED2FLU*int_motion(4:6);
 
     % Get radian info
-    rI = getSphericCoord(egoPos, egoVel, intPos, intVel);
+    [rI, tFI] = getSphericCoord(egoPos, egoVel, intPos, intVel);
     
     relPos = intPos - egoPos;
     relVel = intVel - egoVel;
@@ -18,9 +18,9 @@ function [rMin, tMin, rI, vI, flag] = isCollision(ego_motion, int_motion, R_safe
     V_A = norm(egoVel);
     V_B = norm(intVel);
     
-    thetaVel = V_B*cos(rI.eta)*sin(rI.mu - rI.theta) - V_A*cos(rI.alpha)*sin(rI.beta - rI.theta);
-    phiVel = V_B*(-cos(rI.eta)*sin(rI.phi)*cos(rI.mu - rI.theta) + sin(rI.eta)*cos(rI.phi)) - V_A*(-cos(rI.alpha)*sin(rI.phi)*cos(rI.beta - rI.theta) + sin(rI.alpha)*cos(rI.phi));
-    rVel = V_B*(cos(rI.eta)*cos(rI.phi)*cos(rI.mu - rI.theta) + sin(rI.eta)*sin(rI.phi)) - V_A*(cos(rI.alpha)*cos(rI.phi)*cos(rI.beta - rI.theta) + sin(rI.alpha)*cos(rI.phi));
+    thetaVel = V_B*tFI.cosEta*tFI.sinMuTheta - V_A*tFI.cosAlpha*tFI.sinBetaTheta;
+    phiVel = V_B*(-tFI.cosEta*tFI.sinPhi*tFI.cosMuTheta + tFI.sinEta*tFI.cosPhi) - V_A*(-tFI.cosAlpha*tFI.sinPhi*tFI.cosBetaTheta + tFI.sinAlpha*tFI.cosPhi);
+    rVel = V_B*(tFI.cosEta*tFI.cosPhi*tFI.cosMuTheta + tFI.sinEta*tFI.sinPhi) - V_A*(tFI.cosAlpha*tFI.cosPhi*tFI.cosBetaTheta + tFI.sinAlpha*tFI.cosPhi);
     
     % Velocity information is defined in FLU spherical coordinate
     vI = struct(...

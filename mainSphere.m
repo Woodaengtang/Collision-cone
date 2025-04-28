@@ -75,7 +75,7 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
                 err = errFcn(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
                 if isnan(gainK)
                     epsilon = err - 0.1;
-                    gainK = 1.01*(1/tMin)*log(err/epsilon);
+                    gainK = 1.001*(1/tMin)*log(err/epsilon);
                 end
                 aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
             end
