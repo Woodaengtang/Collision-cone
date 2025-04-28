@@ -90,7 +90,7 @@ parfor i = 1 : length(IntruderRandomPoints)
                 egoUAV.guidanceControl(refVel);
                 if norm(egoUAV.r - intPos) < 20
                     [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts);
-                    [rMin, tMin, radInfo, velInfo, flag] = isCollision(egoUAV.x, EstIntruderMotion, R_safe);
+                    [rMin, tMin, radInfo, velInfo, flag] = isCollisionSphere(egoUAV.x, EstIntruderMotion, R_safe);
                     if flag
                         refDelta = pi/3;
                         refGamma = pi/4;

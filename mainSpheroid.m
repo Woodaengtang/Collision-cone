@@ -57,6 +57,11 @@ successive_idx  = 0;    % Loop iteration counter for closed-loop control
 guidance_ = 20;         % Guidance control module period (executed at 50Hz)
 attitude_ = 4;          % Attitude control module period (executed at 250Hz)
 
+CPA_data = [];
+intCPA = NaN([3, 1]);
+egoCPA = NaN([3, 1]);
+flag = false;
+
 while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     % Update Intruder's State (Constant Velocity Assumption)
     intPos = intPos + ts * intVel + (ts^2 * intAcc)/2;
@@ -68,17 +73,20 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
         egoUAV.guidanceControl(refVel);        
         if norm(egoUAV.r - intPos) < 20
             [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts);
-            [rMin, tMin, radInfo, velInfo, flag] = isCollisionSphere(egoUAV.x, EstIntruderMotion, R_safe);
-            if flag
-                refDelta = pi/3;
-                refGamma = pi/4;
-                err = errFcn(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
-                if isnan(gainK)
-                    epsilon = err - 0.1;
-                    gainK = 1.001*(1/tMin)*log(err/epsilon);
-                end
-                aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
+            [isDangerous, t_CPA, egoCPA, intCPA] = isCollision(egoUAV.x, EstIntruderMotion, R_safe);
+            if size(CPA_data, 2) > data_size - 1
+                CPA_data(:, 1:end-1) = CPA_data(:, 2:end);
+                CPA_data(:, end) = intCPA;
+            else
+                CPA_data = [CPA_data, intCPA];
             end
+        end
+
+        if isDangerous
+            [scale, rotation, threat_, std_] = getScaleData(CPA_data, R_safe);
+            [C1, C2] = getFoci(scale, rotation, intCPA, R_safe);
+            [rMin, tMin, rI, vI, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, R_safe, C1, C2);
+
         end
     end
 
@@ -92,6 +100,7 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
             egoUAV.theta_des = acos(temp);
             egoUAV.psi_des = pi/2;
             egoUAV.angleSaturation();
+            flag = false;
         end
         egoUAV.attitudeControl();
     end
