@@ -28,9 +28,6 @@ intAcc = [0, 0, 0]';
 %% Variable Initialization for Logging and Control
 R_safe = 3;                 % Set the safety radius (3 m)
 d_thres = 0.5;              % Set the threshold distance for waypoint arrival
-aiming_point = [];          % Aiming (target) point
-prev_waypoint = drone_initStates(1:3);  % Initialize previous waypoint with initial position
-next_waypoint = egoGoalpoint;           % Initially set next waypoint as goal point
 
 ego_state_log = [];         % Log for full quadcopter state (position, velocity, Euler angles, angular rates)
 ego_command_log = [];       % Log for command output (desired control values)
@@ -61,6 +58,8 @@ CPA_data = [];
 intCPA = NaN([3, 1]);
 egoCPA = NaN([3, 1]);
 flag = false;
+isDangerous = false;
+data_size = 20;
 
 while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     % Update Intruder's State (Constant Velocity Assumption)
@@ -83,10 +82,17 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
         end
 
         if isDangerous
-            [scale, rotation, threat_, std_] = getScaleData(CPA_data, R_safe);
+            [scale, rotation] = getScaleData(CPA_data, R_safe);
             [C1, C2] = getFoci(scale, rotation, intCPA, R_safe);
-            [rMin, tMin, rI, vI, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, R_safe, C1, C2);
-
+            [rMin, tMin, rI, vI, rM, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, R_safe, C1, C2);
+            err = errFcnSpheroid(vI, scale, R_safe, rM);
+            if isnan(gainK)
+                epsilon = err - 0.1;
+                gainK = 1.001 * (1 / tMin) * log(err / epsilon);
+                refDelta = pi/3;
+                refGamma = pi/4;
+            end
+            aA = refAccSpheroid(err, gainK, rI, vI, rM, refDelta, refGamma);
         end
     end
 
@@ -121,7 +127,7 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     tMin_log = [tMin_log, tMin];
 end
 
-folderPath = fullfile(pwd, 'log', 'single');
+folderPath = fullfile(pwd, 'log', 'spheroid');
 
 % Create output folder if it does not exist
 if ~exist(folderPath, 'dir')
@@ -129,7 +135,7 @@ if ~exist(folderPath, 'dir')
 end
 
 % Save all main log variables to a MAT file using grouped save commands
-save(fullfile(folderPath, "SimSingle.mat"), "ego_state_log", ...
+save(fullfile(folderPath, "SimSpheroid.mat"), "ego_state_log", ...
     "intruder_state_log", "ego_command_log", "control_input_log", ...
     "rMin_log", "aA_log", "err_log", "tMin_log");
 
