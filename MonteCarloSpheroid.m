@@ -92,9 +92,7 @@ parfor i = 1 : length(IntruderRandomPoints)
                 else
                     CPA_data = [CPA_data, intCPA];
                 end
-            end
-
-            if isDangerous
+                
                 [scale, rotation] = getScaleData(CPA_data, R_safe);
                 [C1, C2] = getFoci(scale, rotation, intCPA, R_safe);
                 [rMin, tMin, rI, vI, rM, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, R_safe, C1, C2);

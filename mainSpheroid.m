@@ -61,6 +61,8 @@ flag = false;
 isDangerous = false;
 data_size = 20;
 
+isFirst = true;
+
 while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     % Update Intruder's State (Constant Velocity Assumption)
     intPos = intPos + ts * intVel + (ts^2 * intAcc)/2;
@@ -71,7 +73,8 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
         refVel = egoSpeed*(egoGoalpoint - egoUAV.r)./norm(egoGoalpoint - egoUAV.r);
         egoUAV.guidanceControl(refVel);        
         if norm(egoUAV.r - intPos) < 20
-            [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts);
+            [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts, isFirst);
+            isFirst = false;
             [isDangerous, t_CPA, egoCPA, intCPA] = isCollision(egoUAV.x, EstIntruderMotion, R_safe);
             if size(CPA_data, 2) > data_size - 1
                 CPA_data(:, 1:end-1) = CPA_data(:, 2:end);
@@ -79,9 +82,7 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
             else
                 CPA_data = [CPA_data, intCPA];
             end
-        end
 
-        if isDangerous
             [scale, rotation] = getScaleData(CPA_data, R_safe);
             [C1, C2] = getFoci(scale, rotation, intCPA, R_safe);
             [rMin, tMin, rI, vI, rM, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, R_safe, C1, C2);
