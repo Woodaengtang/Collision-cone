@@ -118,10 +118,6 @@ parfor i = 1 : length(IntruderRandomPoints)
 
         ego_state_log = [ego_state_log, egoUAV.x];
         intruder_state_log = [intruder_state_log, intruderMotion];
-        % ego_command_log = [ego_command_log, egoUAV.getCommand()];
-        % rMin_log = [rMin_log, rMin];
-        % aA_log = [aA_log, aA];
-        % err_log = [err_log, err];
     end
     miss_dist = [];
     traj_deviation = [];
@@ -169,4 +165,4 @@ if ~exist(folderPath, 'dir')
     mkdir(folderPath);
 end
 
-save(fullfile(folderPath, "ResultMC.mat"), "arrivalTime", "minMissDist", "trajectoryDeviation", "maxDistPath");
+save(fullfile(folderPath, "ResultMC_sphere.mat"), "arrivalTime", "minMissDist", "trajectoryDeviation", "maxDistPath");

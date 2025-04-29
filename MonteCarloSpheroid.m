@@ -18,22 +18,23 @@ arrivalTime = [];
 d_thres = 0.5;
 
 sig_k = 0.985;
-guidance_       = 20;               % guidance index for modular operation 50Hz
-attitude_       = 4;                % attitude index for modular operation 250Hz
+data_size = 20;
+guidance_ = 20;               % guidance index for modular operation 50Hz
+attitude_ = 4;                % attitude index for modular operation 250Hz
 
 dq = parallel.pool.DataQueue;
 afterEach(dq, @nUpdate);
 
-function nUpdate(~)
-persistent progress N
-if isempty(progress)
-    progress = 0;
-    N = 500;
-end
-progress = progress + 1;
-fprintf("Progress: %d / %d (%.1f%%)\n", ...
-    progress, N, 100*progress/N);
-end
+    function nUpdate(~)
+        persistent progress N
+        if isempty(progress)
+            progress = 0;
+            N = 500;
+        end
+        progress = progress + 1;
+        fprintf("Progress: %d / %d (%.1f%%)\n", ...
+            progress, N, 100*progress/N);
+    end
 
 parfor i = 1 : length(IntruderRandomPoints)
     successive_idx  = 0;        % Index for successive closed loop
@@ -66,6 +67,12 @@ parfor i = 1 : length(IntruderRandomPoints)
 
     flag = false;
     isFirst = true;
+    EstIntruderMotion = NaN([9, 1]);
+    intCPA = NaN([3, 1]);
+    gainK = NaN;
+    refDelta = NaN;
+    refGamma = NaN;
+    
     while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
         % Update Intruder's State (Constant Velocity Assumption)
         intPos = intPos + ts * intVel + (ts^2 * intAcc)/2;
@@ -76,7 +83,8 @@ parfor i = 1 : length(IntruderRandomPoints)
             refVel = egoSpeed*(egoGoalpoint - egoUAV.r)./norm(egoGoalpoint - egoUAV.r);
             egoUAV.guidanceControl(refVel);
             if norm(egoUAV.r - intPos) < 20
-                [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts);
+                [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts, isFirst);
+                isFirst = false;
                 [isDangerous, t_CPA, egoCPA, intCPA] = isCollision(egoUAV.x, EstIntruderMotion, R_safe);
                 if size(CPA_data, 2) > data_size - 1
                     CPA_data(:, 1:end-1) = CPA_data(:, 2:end);
@@ -123,6 +131,7 @@ parfor i = 1 : length(IntruderRandomPoints)
         refVel = prev_refVel*sig_k + (1 - sig_k)*refVel;
 
         ego_state_log = [ego_state_log, egoUAV.x];
+        intruder_state_log = [intruder_state_log, intruderMotion];
     end
     miss_dist = [];
     traj_deviation = [];
@@ -170,4 +179,4 @@ if ~exist(folderPath, 'dir')
     mkdir(folderPath);
 end
 
-save(fullfile(folderPath, "ResultMC.mat"), "arrivalTime", "minMissDist", "trajectoryDeviation", "maxDistPath");
+save(fullfile(folderPath, "ResultMC_spheroid.mat"), "arrivalTime", "minMissDist", "trajectoryDeviation", "maxDistPath");
