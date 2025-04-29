@@ -44,8 +44,8 @@ function [rMin, tMin, rI, vI, rm, flag] = isCollisionSpheroid(ego_motion, int_mo
     vI.c1 = vI1;
     vI.c2 = vI2;
 
-    rm1 = sqrt((relC1'*relC1)*(thetaVel1^2 + phiVel1^2)/(relVel'*relVel));
-    rm2 = sqrt((relC2'*relC2)*(thetaVel2^2 + phiVel2^2)/(relVel'*relVel));
+    rm1 = sqrt((relC1'*relC1)*(thetaVel1^2 + phiVel1^2)/(thetaVel1^2 + phiVel1^2 +rVel1^2));
+    rm2 = sqrt((relC2'*relC2)*(thetaVel2^2 + phiVel2^2)/(thetaVel2^2 + phiVel2^2 +rVel2^2));
     rm = struct( ...
         "rm1", rm1,...
         "rm2", rm2);
