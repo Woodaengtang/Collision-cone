@@ -1,4 +1,4 @@
-function [C1, C2] = getFoci(scale, rotation, intCPA, R_safe)
+function [C1, C2, a] = getFoci(scale, rotation, intCPA, R_safe)
     
     a = R_safe*scale(1);
     b = R_safe*scale(2);

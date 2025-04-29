@@ -84,8 +84,8 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
             end
 
             [scale, rotation] = getScaleData(CPA_data, R_safe);
-            [C1, C2] = getFoci(scale, rotation, intCPA, R_safe);
-            [rMin, tMin, rI, vI, rM, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, R_safe, C1, C2);
+            [C1, C2, a] = getFoci(scale, rotation, intCPA, R_safe);
+            [rMin, tMin, rI, vI, rM, flag] = isCollisionSpheroid(egoUAV.x, EstIntruderMotion, a, C1, C2);
             err = errFcnSpheroid(vI, scale, R_safe, rM);
             if isnan(gainK)
                 epsilon = err - 0.1;
