@@ -1,4 +1,4 @@
-function [state, measured] = kineticKalman(motion, time_step)
+function [state, measured] = kineticKalman(motion, time_step, isFirst)
     % From sensor, NED position is obtained
     % Using kinetic Kalman Filter, Estimate intruder's state
     
@@ -10,10 +10,8 @@ function [state, measured] = kineticKalman(motion, time_step)
     persistent R    % Measurement noise Covariance matrix
     persistent dt   % Time step
     persistent y    % for measured values
-    persistent isFirst
-    
-    if isempty(isFirst)
-        isFirst = 1;
+        
+    if isFirst
         dt = time_step;
         A = eye(9) +...
             dt * [0, 0, 0, 1, 0, 0, 0, 0, 0;...
@@ -45,8 +43,6 @@ function [state, measured] = kineticKalman(motion, time_step)
         Q = diag(diagQ);
         R = diag(diagR);
         
-        % x = [motion(1), motion(2), motion(3),...
-        %     motion(4), motion(5), motion(6), 0, 0, 0]';
         x = [motion(1), motion(2), motion(3),...
             0, 0, 0, 0, 0, 0]';
         y = [];

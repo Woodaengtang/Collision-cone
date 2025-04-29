@@ -2,7 +2,7 @@ clc; close all; clear all;
 
 %% Index
 % Set the path to the "single" folder inside "log"
-folderPath = fullfile(pwd, "log", "single");
+folderPath = fullfile(pwd, "log", "sphere");
 
 % Get a list of all .mat files in the "single" folder
 matFiles = dir(fullfile(folderPath, "*.mat"));
@@ -20,7 +20,6 @@ R_safe = 3;
 scenario_interval = 20;
 nonzero = 3140;
 datalength = 20;
-snapshot_linewidth = 2;
 
 miss_dist = zeros([1, length(ego_state_log)]);
 traj_deviation = zeros([3, length(ego_state_log)]);

@@ -72,12 +72,12 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
             if flag
                 refDelta = pi/3;
                 refGamma = pi/4;
-                err = errFcn(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
+                err = errFcnSphere(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
                 if isnan(gainK)
                     epsilon = err - 0.1;
                     gainK = 1.001*(1/tMin)*log(err/epsilon);
                 end
-                aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
+                aA = refAccSphere(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
             end
         end
     end
@@ -112,7 +112,7 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     tMin_log = [tMin_log, tMin];
 end
 
-folderPath = fullfile(pwd, 'log', 'single');
+folderPath = fullfile(pwd, 'log', 'sphere');
 
 % Create output folder if it does not exist
 if ~exist(folderPath, 'dir')
@@ -120,7 +120,7 @@ if ~exist(folderPath, 'dir')
 end
 
 % Save all main log variables to a MAT file using grouped save commands
-save(fullfile(folderPath, "SimSingle.mat"), "ego_state_log", ...
+save(fullfile(folderPath, "SimSphere.mat"), "ego_state_log", ...
     "intruder_state_log", "ego_command_log", "control_input_log", ...
     "rMin_log", "aA_log", "err_log", "tMin_log");
 

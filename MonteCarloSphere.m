@@ -38,14 +38,10 @@ end
 parfor i = 1 : length(IntruderRandomPoints)
     successive_idx  = 0;        % Index for successive closed loop
     ego_state_log = [];         % Log for full quadcopter state (position, velocity, Euler angles, angular rates)
-    ego_command_log = [];       % Log for command output (desired control values)
     intruder_state_log = [];    % Log for intruder's state
-    rMin_log = [];
     rMin = NaN;
     aA = NaN([3, 1]);
-    aA_log = [];
     err = NaN;
-    err_log = [];
 
     % Quadcopter Initialization
     drone_initStates = [0, 0, -10,...           %   x     y    z
@@ -61,8 +57,6 @@ parfor i = 1 : length(IntruderRandomPoints)
     prev_refVel = refVel;
     refAtt = [];
 
-    % calculate of intruder's speed by collision point
-    % collisionTime = RandomCollisionPoints(2, i) / egoSpeed;
     intPos = IntruderRandomPoints(:, i);
     intVel = IntruderVeloicty(:, i);
     intAcc = [0; 0; 0];
@@ -71,7 +65,7 @@ parfor i = 1 : length(IntruderRandomPoints)
     isDangerous = false;
 
     flag = false;
-
+    isFirst = true;
     while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
         %%%%%%%%% Intruder's Constant Velocity Assumption %%%%%%%%%
         intPos = intPos + ts * intVel + ts^2 * intAcc/2;
@@ -89,14 +83,15 @@ parfor i = 1 : length(IntruderRandomPoints)
                 refVel = egoSpeed*(egoGoalpoint - egoUAV.r)./norm(egoGoalpoint - egoUAV.r);
                 egoUAV.guidanceControl(refVel);
                 if norm(egoUAV.r - intPos) < 20
-                    [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts);
+                    [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts, isFirst);
+                    isFirst = false;
                     [rMin, tMin, radInfo, velInfo, flag] = isCollisionSphere(egoUAV.x, EstIntruderMotion, R_safe);
                     if flag
                         refDelta = pi/3;
                         refGamma = pi/4;
                         gainK = 0.01;
-                        aA = refAcc(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
-                        err = errFcn(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
+                        aA = refAccSphere(egoUAV.x, EstIntruderMotion, radInfo, velInfo, gainK, R_safe, refDelta, refGamma);
+                        err = errFcnSphere(egoUAV.x, EstIntruderMotion, velInfo, R_safe);
                     end
                 end
             end
@@ -123,10 +118,10 @@ parfor i = 1 : length(IntruderRandomPoints)
 
         ego_state_log = [ego_state_log, egoUAV.x];
         intruder_state_log = [intruder_state_log, intruderMotion];
-        ego_command_log = [ego_command_log, egoUAV.getCommand()];
-        rMin_log = [rMin_log, rMin];
-        aA_log = [aA_log, aA];
-        err_log = [err_log, err];
+        % ego_command_log = [ego_command_log, egoUAV.getCommand()];
+        % rMin_log = [rMin_log, rMin];
+        % aA_log = [aA_log, aA];
+        % err_log = [err_log, err];
     end
     miss_dist = [];
     traj_deviation = [];
@@ -150,9 +145,6 @@ parfor i = 1 : length(IntruderRandomPoints)
     trajectoryDeviation = [trajectoryDeviation, max(data_deviation)];
     maxDistPath = [maxDistPath, max(dist_from_path)];
     arrivalTime = [arrivalTime, time];
-    % clear kineticKalman
-    % clear Int egoUAV;
-    % disp(i);
     send(dq, i);
 end
 %%
