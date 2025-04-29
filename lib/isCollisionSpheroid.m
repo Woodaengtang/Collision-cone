@@ -51,8 +51,8 @@ function [rMin, tMin, rI, vI, rm, flag] = isCollisionSpheroid(ego_motion, int_mo
         "rm2", rm2);
     rMin = rm1 + rm2;
 
-    tm1 = -(rm1*rVel1)/(relVel'*relVel);
-    tm2 = -(rm2*rVel2)/(relVel'*relVel);
+    tm1 = -(rm1*rVel1)/(thetaVel1^2 + phiVel1^2 +rVel1^2);
+    tm2 = -(rm2*rVel2)/(thetaVel2^2 + phiVel2^2 +rVel2^2);
     tMin = (rm1*tm2 + rm2*tm1)/(rm1 + rm2);
     
     if (rm1 + rm2)^2 <= (2*rMajor)^2
