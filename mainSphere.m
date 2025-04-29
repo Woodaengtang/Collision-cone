@@ -56,7 +56,7 @@ gainK = NaN;
 successive_idx  = 0;    % Loop iteration counter for closed-loop control
 guidance_ = 20;         % Guidance control module period (executed at 50Hz)
 attitude_ = 4;          % Attitude control module period (executed at 250Hz)
-
+isFirst = true;
 while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
     % Update Intruder's State (Constant Velocity Assumption)
     intPos = intPos + ts * intVel + (ts^2 * intAcc)/2;
@@ -67,7 +67,8 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
         refVel = egoSpeed*(egoGoalpoint - egoUAV.r)./norm(egoGoalpoint - egoUAV.r);
         egoUAV.guidanceControl(refVel);        
         if norm(egoUAV.r - intPos) < 20
-            [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts);
+            [EstIntruderMotion, measured] = kineticKalman(intruderMotion, guidance_*ts, isFirst);
+            isFirst = false;
             [rMin, tMin, radInfo, velInfo, flag] = isCollisionSphere(egoUAV.x, EstIntruderMotion, R_safe);
             if flag
                 refDelta = pi/3;
