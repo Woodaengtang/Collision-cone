@@ -28,11 +28,11 @@ function [rMin, tMin, rI, vI, flag] = isCollisionSphere(ego_motion, int_motion, 
         "phiVel", phiVel,...
         "rVel", rVel);
 
-    rMin2 = norm(relPos)^2*((thetaVel^2 + phiVel^2)/(relVel'*relVel));
+    rMin2 = norm(relPos)^2*((thetaVel^2 + phiVel^2)/(thetaVel^2 + phiVel^2 + rVel));
     rMin = sqrt(rMin2);
     tMin = -(norm(relPos)*rVel)/(relVel'*relVel);
 
-    if rMin2 < R_safe^2
+    if rMin2 <= R_safe^2
         flag = true;    % in collision threat
     else
         flag = false;   % not in collision threat

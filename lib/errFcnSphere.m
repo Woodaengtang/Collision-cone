@@ -9,6 +9,6 @@ function err = errFcnSphere(ego_motion, int_motion, velInfo, R_safe)
     a = velInfo.thetaVel^2 + velInfo.phiVel^2;
     b = (a + velInfo.rVel^2);
     
-    err = -((relPos'*relPos)*a/b - R_safe^2);
+    err = ((relPos'*relPos)*a/b - R_safe^2);
 end
 

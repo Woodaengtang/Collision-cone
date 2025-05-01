@@ -93,7 +93,8 @@ while and(time <= 60, norm(egoUAV.r - egoGoalpoint) > d_thres)
             egoUAV.theta_des = acos(temp);
             egoUAV.psi_des = pi/2;
             egoUAV.angleSaturation();
-        end
+            flag = false;
+        end        
         egoUAV.attitudeControl();
     end
     egoUAV.rateControl();
@@ -125,3 +126,4 @@ save(fullfile(folderPath, "SimSphere.mat"), "ego_state_log", ...
     "intruder_state_log", "ego_command_log", "control_input_log", ...
     "rMin_log", "aA_log", "err_log", "tMin_log");
 
+run("spherePlot.m");
