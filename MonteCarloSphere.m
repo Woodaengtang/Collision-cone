@@ -144,15 +144,15 @@ parfor i = 1 : length(IntruderRandomPoints)
     send(dq, i);
 end
 %%
-fig_min_miss_dist = figure(1);
+fig_min_miss_dist = figure();
 cases = 1:1:500;
 scatter(cases, minMissDist);
 hold on; grid on;
 plot(cases, 3*ones([1, length(cases)]), 'r--');
-xlabel("cases");
-ylabel("Min miss distance(m)");
+xlabel("cases"); ylabel("Min miss distance(m)");
+title("Min miss distances of spherical bounding box");
 
-fig_max_traj_dev = figure(2);
+fig_max_traj_dev = figure();
 scatter(cases, trajectoryDeviation);
 hold on; grid on;
 xlabel("cases");
