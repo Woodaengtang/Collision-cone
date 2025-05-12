@@ -237,7 +237,7 @@ xlabel("time(s)"); ylabel("M_k");
 grid on
 
 figure();
-plot(time, -err_log, "LineWidth", output_linewidth);
+plot(time, err_log, "LineWidth", output_linewidth);
 grid on
 hold on
 plot(time, zeros([1,length(time)]), "r--" ,"LineWidth", input_linewidth);

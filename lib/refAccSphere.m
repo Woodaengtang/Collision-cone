@@ -14,9 +14,9 @@ function  aA = refAccSphere(ego_motion, int_motion, radInfo, velInfo, gainK, R_s
     cosGamma = cos(gamma);
     sinPhi = sin(radInfo.phi);
     cosDeltaTheta = cos(delta - radInfo.theta);
-    A = -0.5*gainK*(relVel'*relVel)/(relPos'*relPos);
-    B = (relPos'*relPos)*(velInfo.thetaVel^2 + velInfo.phiVel^2) - R_safe^2*(relVel'*relVel);
-    C = -velInfo.thetaVel*(velInfo.rVel^2)*cosGamma*sin(delta - radInfo.theta) + velInfo.phiVel*(velInfo.rVel^2)*(cosGamma*sinPhi*cosDeltaTheta - sinGamma*cos(radInfo.phi)) + velInfo.rVel*(relVel'*relVel - velInfo.rVel^2)*(cosGamma*cos(radInfo.phi)*cosDeltaTheta + sinGamma*sinPhi);
+    A = -0.5*gainK*(velInfo.thetaVel^2 + velInfo.phiVel^2 + velInfo.rVel^2)/(relPos'*relPos);
+    B = (relPos'*relPos)*(velInfo.thetaVel^2 + velInfo.phiVel^2) - R_safe^2*(velInfo.thetaVel^2 + velInfo.phiVel^2 + velInfo.rVel^2);
+    C = -velInfo.thetaVel*(velInfo.rVel^2)*cosGamma*sin(delta - radInfo.theta) + velInfo.phiVel*(velInfo.rVel^2)*(cosGamma*sinPhi*cosDeltaTheta - sinGamma*cos(radInfo.phi)) + velInfo.rVel*(velInfo.thetaVel^2 +velInfo.phiVel^2)*(cosGamma*cos(radInfo.phi)*cosDeltaTheta + sinGamma*sinPhi);
 
     scale = A*B/C;
 
